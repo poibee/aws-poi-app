@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  GitHubOwner:
+    Type: String
+    Description: GitHub-Benutzername oder Organisation
+  GitHubRepo:
+    Type: String
+    Description: GitHub-Repository-Name
+  GitHubBranch:
+    Type: String
+    Default: main
+  GitHubConnectionArn:
+    Type: String
+    Description: ARN der GitHub-Verbindung
+  ArtifactBucketName:
+    Type: String
+    Description: Name des S3-Buckets für Artefakte
+  AppBucketName:
+    Type: String
+    Description: Name des S3-Buckets für die App (muss global eindeutig sein)
+    Default: aws-poi-app-bucket
+
+Resources:
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+    
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess'
+    
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+    
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        PrivilegedMode: true
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+    
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucketName
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Sub ${GitHubOwner}/${GitHubRepo}
+                BranchName: !Ref GitHubBranch
+              OutputArtifacts:
+                - Name: SourceCode
+                
+        - Name: Build
+          Actions:
+            - Name: BuildApp
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+                
+        - Name: Deploy
+          Actions:
+            - Name: CreateOrUpdateInfrastructure
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: aws-poi-app-infrastructure
+                TemplatePath: BuildOutput::infrastructure.yaml
+                RoleArn: !GetAtt CloudFormationServiceRole.Arn
+                Capabilities: CAPABILITY_IAM
+                ParameterOverrides: !Sub '{"BucketName": "${AppBucketName}"}'
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+                
+            - Name: DeployToS3
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                BucketName: !Ref AppBucketName
+                Extract: true
+                ObjectKey: www/
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 2
+
+Outputs:
+  PipelineURL:
+    Description: URL zur CodePipeline-Konsole
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
