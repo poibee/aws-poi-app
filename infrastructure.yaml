@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infrastruktur für die Ionic-App-Bereitstellung'
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Name des S3-Buckets für das Hosting
+    Default: aws-poi-app-bucket
+
+Resources:
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:GetObject'
+            Effect: Allow
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref WebsiteBucket, '/*']]
+            Principal: '*'
+            
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.DomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+Outputs:
+  WebsiteURL:
+    Description: URL für die auf S3 gehostete Website
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+  CloudFrontDomainName:
+    Description: Domain-Name der CloudFront-Distribution
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  BucketName:
+    Description: Name des S3-Buckets
+    Value: !Ref WebsiteBucket
