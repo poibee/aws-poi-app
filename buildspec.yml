@@ -16,9 +16,11 @@ phases:
     commands:
       - echo "Build abgeschlossen"
       - cp infrastructure.yaml www/
+      - mkdir -p deploy_root
+      - cp -r www/* deploy_root/
 
 artifacts:
   files:
     - '**/*'
-  base-directory: www
+  base-directory: deploy_root
   discard-paths: yes
