@@ -123,6 +123,7 @@ Resources:
                 - Name: SourceCode
               OutputArtifacts:
                 - Name: BuildOutput
+                - Name: InfrastructureTemplate
                 
         - Name: Deploy
           Actions:
@@ -135,12 +136,12 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE
                 StackName: aws-poi-app-infrastructure
-                TemplatePath: BuildOutput::infrastructure.yaml
+                TemplatePath: InfrastructureTemplate::infrastructure.yaml
                 RoleArn: !GetAtt CloudFormationServiceRole.Arn
                 Capabilities: CAPABILITY_IAM
                 ParameterOverrides: !Sub '{"BucketName": "${AppBucketName}"}'
               InputArtifacts:
-                - Name: BuildOutput
+                - Name: InfrastructureTemplate
               RunOrder: 1
                 
             - Name: DeployToS3
