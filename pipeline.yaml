@@ -106,6 +106,7 @@ Resources:
                 ConnectionArn: !Ref GitHubConnectionArn
                 FullRepositoryId: !Sub ${GitHubOwner}/${GitHubRepo}
                 BranchName: !Ref GitHubBranch
+                DetectChanges: true
               OutputArtifacts:
                 - Name: SourceCode
                 
