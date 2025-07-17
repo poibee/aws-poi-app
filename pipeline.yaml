@@ -152,7 +152,6 @@ Resources:
               Configuration:
                 BucketName: !Ref AppBucketName
                 Extract: true
-                ObjectKey: ""
               InputArtifacts:
                 - Name: BuildOutput
               RunOrder: 2
