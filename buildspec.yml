@@ -15,6 +15,7 @@ phases:
   post_build:
     commands:
       - echo "Build abgeschlossen"
+      - cp infrastructure.yaml www/
 
 artifacts:
   files:
