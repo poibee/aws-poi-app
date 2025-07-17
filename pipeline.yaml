@@ -152,7 +152,7 @@ Resources:
               Configuration:
                 BucketName: !Ref AppBucketName
                 Extract: true
-                ObjectKey: www/
+                ObjectKey: ""
               InputArtifacts:
                 - Name: BuildOutput
               RunOrder: 2
