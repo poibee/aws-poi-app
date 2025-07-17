@@ -20,5 +20,5 @@ artifacts:
   files:
     - '**/*'
     - ../infrastructure.yaml
-  base-directory: www/www
+  base-directory: www
   discard-paths: no
