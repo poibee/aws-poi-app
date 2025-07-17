@@ -19,5 +19,6 @@ phases:
 artifacts:
   files:
     - '**/*'
-    - infrastructure.yaml
+    - ../infrastructure.yaml
+  base-directory: www/www
   discard-paths: no
